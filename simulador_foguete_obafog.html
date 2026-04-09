@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador OBAFOG Nível 4 — Otimizador de Trajetória</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:#0a0c10; --surface:#111318; --surface2:#181c24;
+      --border:rgba(255,255,255,0.07);
+      --accent:#00e5a0; --accent2:#ff6b35; --accent3:#4d9fff;
+      --text:#e8eaf0; --muted:#6b7280;
+      --danger:#ff4444; --warn:#ffaa00;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh}
+    .bg-grid{position:fixed;inset:0;pointer-events:none;z-index:0;
+      background-image:linear-gradient(rgba(0,229,160,.03)1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,229,160,.03)1px,transparent 1px);
+      background-size:40px 40px}
+    .container{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:24px 16px}
+    .header{text-align:center;margin-bottom:28px;padding:36px 0 24px;border-bottom:.5px solid var(--border)}
+    .header-badge{display:inline-block;font-family:'Space Mono',monospace;font-size:10px;
+      letter-spacing:.2em;color:var(--accent);border:.5px solid var(--accent);
+      padding:4px 14px;border-radius:2px;margin-bottom:16px}
+    .header h1{font-size:clamp(22px,4vw,30px);font-weight:800;letter-spacing:-.02em;line-height:1.15}
+    .header h1 span{color:var(--accent)}
+    .header p{font-size:11px;color:var(--muted);margin-top:8px;font-family:'Space Mono',monospace;letter-spacing:.05em}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+    .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+    .grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+    @media(max-width:620px){
+      .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+      .sweep-grid{grid-template-columns:1fr}
+    }
+    .card{background:var(--surface);border:.5px solid var(--border);border-radius:12px;padding:18px}
+    .card-title{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.15em;
+      color:var(--muted);text-transform:uppercase;margin-bottom:14px;
+      display:flex;align-items:center;gap:8px}
+    .card-title::before{content:'//';color:var(--accent)}
+    label{font-size:11px;color:var(--muted);display:block;margin-bottom:5px;font-family:'Space Mono',monospace}
+    input[type=text],input[type=number],select{
+      width:100%;background:var(--surface2);border:.5px solid var(--border);
+      border-radius:6px;color:var(--text);font-family:'Space Mono',monospace;
+      font-size:13px;padding:9px 11px;outline:none;transition:border-color .2s;-webkit-appearance:none}
+    input:focus,select:focus{border-color:var(--accent)}
+    select option{background:var(--surface2);color:var(--text)}
+    .field{margin-bottom:12px}
+    .field-row{display:flex;gap:7px}
+    .field-row input,.field-row select{flex:1}
+    .unit{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);
+      padding:9px 9px;background:var(--surface2);border:.5px solid var(--border);
+      border-radius:6px;white-space:nowrap;flex-shrink:0}
+    .btn-primary{width:100%;background:var(--accent);color:#000;border:none;border-radius:8px;
+      font-family:'Syne',sans-serif;font-weight:700;font-size:14px;padding:13px;cursor:pointer;
+      letter-spacing:.04em;transition:opacity .2s,transform .1s;margin-top:4px}
+    .btn-primary:hover{opacity:.88}
+    .btn-primary:active{transform:scale(.99)}
+    .btn-primary:disabled{opacity:.4;cursor:not-allowed}
+    .btn-sm{background:var(--surface2);color:var(--accent);border:.5px solid var(--accent);
+      border-radius:6px;font-family:'Space Mono',monospace;font-size:11px;padding:7px 13px;
+      cursor:pointer;transition:background .15s;white-space:nowrap;flex-shrink:0}
+    .btn-sm:hover{background:rgba(0,229,160,.1)}
+    .btn-danger{background:var(--surface2);color:var(--danger);border:.5px solid var(--danger);
+      border-radius:6px;font-family:'Space Mono',monospace;font-size:11px;padding:7px 13px;
+      cursor:pointer;transition:background .15s;white-space:nowrap}
+    .btn-danger:hover{background:rgba(255,68,68,.1)}
+    .metric{background:var(--surface2);border-radius:8px;padding:13px;text-align:center}
+    .metric-val{font-size:24px;font-weight:800;font-family:'Space Mono',monospace}
+    .metric-val.accent{color:var(--accent)}
+    .metric-val.orange{color:var(--accent2)}
+    .metric-val.blue{color:var(--accent3)}
+    .metric-val.warn{color:var(--warn)}
+    .metric-lbl{font-size:9px;color:var(--muted);margin-top:4px;letter-spacing:.1em;font-family:'Space Mono',monospace}
+    .status-bar{display:flex;align-items:center;gap:10px;background:var(--surface2);
+      border-radius:6px;padding:9px 13px;font-family:'Space Mono',monospace;
+      font-size:11px;color:var(--muted);margin-bottom:14px}
+    .status-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+    .status-dot.ok{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+    .status-dot.loading{background:var(--warn);animation:pulse 1s infinite}
+    .status-dot.error{background:var(--danger)}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .angle-visual{height:180px;background:var(--surface2);border-radius:10px;overflow:hidden;margin-bottom:12px}
+    .angle-visual canvas{width:100%;height:100%;display:block}
+    .result-block{border:.5px solid var(--accent);border-radius:10px;
+      background:rgba(0,229,160,.04);padding:18px;margin-top:8px}
+    .result-block.hidden{display:none}
+    .result-title{font-size:15px;font-weight:700;color:var(--accent);
+      margin-bottom:14px;display:flex;align-items:center;gap:10px}
+    .angle-ring{display:flex;align-items:center;justify-content:center;
+      width:86px;height:86px;border-radius:50%;border:3px solid var(--accent);
+      background:rgba(0,229,160,.08);font-size:24px;font-weight:800;
+      font-family:'Space Mono',monospace;color:var(--accent);flex-shrink:0}
+    .result-info{display:flex;align-items:center;gap:18px;margin-bottom:18px;flex-wrap:wrap}
+    .sweep-bar{height:5px;background:var(--surface);border-radius:3px;overflow:hidden;margin:5px 0}
+    .sweep-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+    .sweep-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .sweep-item{background:var(--surface2);border-radius:6px;padding:9px 11px;
+      display:flex;align-items:center;gap:9px;border:.5px solid transparent}
+    .sweep-item.best{border-color:var(--accent)}
+    .sweep-angle{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;min-width:36px}
+    .sweep-item.best .sweep-angle{color:var(--accent)}
+    .sweep-dist{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto;white-space:nowrap}
+    .log{background:var(--surface2);border-radius:8px;padding:13px;font-family:'Space Mono',monospace;
+      font-size:11px;color:var(--muted);max-height:150px;overflow-y:auto;line-height:2}
+    .log .line-ok{color:var(--accent)}
+    .log .line-warn{color:var(--warn)}
+    .log .line-info{color:var(--accent3)}
+    .log .line-err{color:var(--danger)}
+    .log::-webkit-scrollbar{width:4px}
+    .log::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+    .csv-zone{border:.5px dashed var(--border);border-radius:8px;padding:22px;text-align:center;
+      font-family:'Space Mono',monospace;font-size:12px;color:var(--muted);
+      cursor:pointer;transition:border-color .2s;position:relative}
+    .csv-zone:hover{border-color:var(--accent)}
+    .csv-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+    .csv-tag{display:inline-block;background:var(--surface2);border:.5px solid var(--border);
+      border-radius:4px;padding:3px 7px;font-size:10px;margin:3px 2px;color:var(--accent3)}
+    .nn-vis{display:flex;align-items:center;justify-content:center;height:90px}
+    .nn-layer{display:flex;flex-direction:column;align-items:center;gap:5px}
+    .nn-node{width:12px;height:12px;border-radius:50%;background:var(--surface2);
+      border:1.5px solid var(--border);transition:border-color .3s,background .3s}
+    .nn-node.active{border-color:var(--accent);background:rgba(0,229,160,.2)}
+    .nn-conn{width:26px;height:1px;background:var(--border);align-self:center;
+      margin-bottom:5px;transition:background .3s}
+    .nn-conn.active{background:rgba(0,229,160,.3)}
+    .nn-lbl{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);margin-top:4px}
+    .tab-nav{display:flex;gap:4px;margin-bottom:14px;flex-wrap:wrap}
+    .tab-btn{font-family:'Space Mono',monospace;font-size:11px;padding:7px 16px;border-radius:6px;
+      border:.5px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}
+    .tab-btn.on{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+    .code-block{background:var(--surface2);border-radius:6px;padding:13px 15px;
+      font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);
+      overflow-x:auto;white-space:pre;line-height:2;border:.5px solid var(--border)}
+    .hist-item{background:var(--surface2);border:.5px solid var(--border);border-radius:8px;
+      padding:13px 15px;margin-bottom:9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .hist-item:hover{border-color:rgba(255,255,255,.15)}
+    .hist-rank{font-family:'Space Mono',monospace;font-size:11px;color:var(--muted);min-width:24px;text-align:center}
+    .hist-badge{font-family:'Space Mono',monospace;font-size:20px;font-weight:700;
+      color:var(--accent);min-width:54px;text-align:center}
+    .hist-meta{flex:1;min-width:140px}
+    .hist-meta-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+    .hist-meta-sub{font-size:11px;color:var(--muted);font-family:'Space Mono',monospace}
+    .hist-stats{display:flex;gap:16px;flex-wrap:wrap}
+    .hist-stat{text-align:center}
+    .hist-stat-val{font-family:'Space Mono',monospace;font-size:13px;font-weight:700}
+    .hist-stat-lbl{font-size:9px;color:var(--muted);letter-spacing:.08em;font-family:'Space Mono',monospace}
+    .hist-actions{display:flex;gap:7px;flex-shrink:0}
+    .hist-empty{text-align:center;padding:32px;font-family:'Space Mono',monospace;
+      font-size:12px;color:var(--muted)}
+    .spacer{margin-bottom:14px}
+    .mt{margin-top:12px}
+    .flex-gap{display:flex;gap:8px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="container">
+
+  <div class="header">
+    <div class="header-badge">OBAFOG NÍVEL 4 — OTIMIZADOR DE TRAJETÓRIA</div>
+    <h1>Simulador de <span>Foguete Químico</span><br>por Deep Learning</h1>
+    <p>física avançada · clima em tempo real · otimização de ângulo · histórico persistente</p>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusMsg">Aguardando configuração...</span>
+  </div>
+
+  <div class="tab-nav">
+    <button class="tab-btn on" onclick="switchTab('config')">Configurar</button>
+    <button class="tab-btn"   onclick="switchTab('csv')">CSV do Foguete</button>
+    <button class="tab-btn"   onclick="switchTab('historico')">Histórico</button>
+    <button class="tab-btn"   onclick="switchTab('modelo')">Modelo NN</button>
+  </div>
+
+  <!-- ══════ TAB CONFIG ══════ -->
+  <div id="tab-config">
+
+    <div class="card spacer">
+      <div class="card-title">Localização e Clima</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Cidade</label>
+          <div class="field-row">
+            <input type="text" id="cidade" placeholder="Ex: Uberaba" value="Uberaba" />
+            <button class="btn-sm" onclick="buscarClima()">Buscar ↗</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>País</label>
+          <select id="pais">
+            <option value="BR" selected>Brasil</option>
+            <option value="PT">Portugal</option>
+            <option value="US">Estados Unidos</option>
+            <option value="AR">Argentina</option>
+            <option value="DE">Alemanha</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="metric"><div class="metric-val accent" id="disp-vento">—</div><div class="metric-lbl">VENTO (m/s)</div></div>
+        <div class="metric"><div class="metric-val blue"   id="disp-pressao">—</div><div class="metric-lbl">PRESSÃO (hPa)</div></div>
+        <div class="metric"><div class="metric-val orange" id="disp-temp">—</div><div class="metric-lbl">TEMP (°C)</div></div>
+      </div>
+    </div>
+
+    <div class="card spacer">
+      <div class="card-title">Dados do Foguete</div>
+      <div class="field">
+        <label>Nome / identificação do foguete</label>
+        <input type="text" id="nomeRocket" placeholder="Ex: Protótipo #1 — bocal 8mm" />
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Massa total do foguete</label>
+          <div class="field-row"><input type="number" id="massaTotal" value="250" min="10" max="5000"/><span class="unit">g</span></div>
+        </div>
+        <div class="field">
+          <label>Diâmetro do CORPO do foguete</label>
+          <div class="field-row"><input type="number" id="diametroCorpo" value="50" min="10" max="300" step="1"/><span class="unit">mm</span></div>
+        </div>
+        <div class="field">
+          <label>Volume da câmara de reação</label>
+          <div class="field-row"><input type="number" id="volumeCamara" value="500" min="50" max="5000"/><span class="unit">mL</span></div>
+        </div>
+        <div class="field">
+          <label>Diâmetro do bocal (bico)</label>
+          <div class="field-row"><input type="number" id="diametroNozzle" value="8" min="2" max="30" step="0.5"/><span class="unit">mm</span></div>
+        </div>
+        <div class="field">
+          <label>Massa do propelente total</label>
+          <div class="field-row"><input type="number" id="massaProp" value="80" min="10" max="500"/><span class="unit">g</span></div>
+        </div>
+        <div class="field">
+          <label>Proporção vinagre/bicarbonato</label>
+          <div class="field-row"><input type="number" id="propVB" value="3" min="0.5" max="15" step="0.5"/><span class="unit">mL/g</span></div>
+        </div>
+        <div class="field">
+          <label>Comprimento total do foguete</label>
+          <div class="field-row"><input type="number" id="comprimento" value="35" min="10" max="200"/><span class="unit">cm</span></div>
+        </div>
+        <div class="field">
+          <label>Pressão de abertura (selamento)</label>
+          <div class="field-row"><input type="number" id="pressaoSelo" value="1.5" min="0.5" max="6" step="0.1"/><span class="unit">bar man.</span></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Formato do nariz (Cd aerodinâmico)</label>
+        <select id="cdSelect">
+          <option value="0.35">Ogiva Von Kármán otimizada — Cd 0.35</option>
+          <option value="0.45">Ogiva cônica fina — Cd 0.45</option>
+          <option value="0.55" selected>Ogiva parabólica média — Cd 0.55</option>
+          <option value="0.75">Cilíndrico sem ponta — Cd 0.75</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card spacer">
+      <div class="card-title">Busca de Ângulo Ótimo</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Ângulo mínimo da faixa</label>
+          <div class="field-row"><input type="number" id="angMin" value="20" min="5" max="80"/><span class="unit">°</span></div>
+        </div>
+        <div class="field">
+          <label>Ângulo máximo da faixa</label>
+          <div class="field-row"><input type="number" id="angMax" value="75" min="10" max="85"/><span class="unit">°</span></div>
+        </div>
+      </div>
+      <div class="angle-visual"><canvas id="trajCanvas"></canvas></div>
+      <button class="btn-primary" id="btnSimular" onclick="rodarSimulacao()">SIMULAR E ENCONTRAR ÂNGULO ÓTIMO</button>
+    </div>
+
+    <div class="card spacer">
+      <div class="card-title">Log de processamento</div>
+      <div class="log" id="logBox"><span class="line-info">// sistema pronto — configure e clique em simular.</span></div>
+    </div>
+
+    <div class="result-block hidden" id="resultBlock">
+      <div class="result-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Resultado da Otimização
+      </div>
+      <div class="result-info">
+        <div class="angle-ring" id="resAngulo">—°</div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:5px">ÂNGULO ÓTIMO CALCULADO</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.7" id="resDesc">—</div>
+        </div>
+      </div>
+      <div class="grid-4" style="margin-bottom:18px">
+        <div class="metric"><div class="metric-val accent" id="resDist">—</div><div class="metric-lbl">DISTÂNCIA (m)</div></div>
+        <div class="metric"><div class="metric-val orange" id="resVel">—</div><div class="metric-lbl">V₀ (m/s)</div></div>
+        <div class="metric"><div class="metric-val blue"   id="resAltura">—</div><div class="metric-lbl">ALTURA MÁX (m)</div></div>
+        <div class="metric"><div class="metric-val warn"   id="resTempo">—</div><div class="metric-lbl">TEMPO VOO (s)</div></div>
+      </div>
+      <div class="card-title" style="margin-bottom:10px">Sweep de ângulos</div>
+      <div class="sweep-grid" id="sweepGrid"></div>
+      <button class="btn-sm mt" id="btnSalvar" onclick="salvarResultado()" style="width:100%;text-align:center;margin-top:14px">
+        SALVAR NO HISTÓRICO ↓
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════ TAB CSV ══════ -->
+  <div id="tab-csv" style="display:none">
+    <div class="card spacer">
+      <div class="card-title">Importar dados via CSV</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.8">Carregue um <code>.csv</code> com os dados do foguete. Os campos são detectados automaticamente pelo cabeçalho.</p>
+      <div class="csv-zone">
+        <input type="file" accept=".csv" onchange="lerCSV(event)" />
+        <div style="font-size:26px;margin-bottom:8px;color:var(--accent)">+</div>
+        <div style="font-size:13px;margin-bottom:8px">Clique ou arraste o CSV aqui</div>
+        <div>
+          <span class="csv-tag">nome_foguete</span><span class="csv-tag">massa_total_g</span>
+          <span class="csv-tag">diametro_corpo_mm</span><span class="csv-tag">volume_camara_ml</span>
+          <span class="csv-tag">diametro_nozzle_mm</span><span class="csv-tag">massa_propelente_g</span>
+          <span class="csv-tag">prop_vinagre_bicarb</span><span class="csv-tag">comprimento_cm</span>
+          <span class="csv-tag">pressao_selo_bar</span>
+        </div>
+      </div>
+      <div id="csvStatus" style="margin-top:12px;font-family:'Space Mono',monospace;font-size:12px;color:var(--muted)"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Modelo de CSV</div>
+      <div class="code-block">nome_foguete,massa_total_g,diametro_corpo_mm,volume_camara_ml,diametro_nozzle_mm,massa_propelente_g,prop_vinagre_bicarb,comprimento_cm,pressao_selo_bar
+Prototipo 1,250,50,500,8,80,3,35,1.5
+Prototipo 2,320,60,700,10,110,3.5,42,2.0
+Prototipo 3,180,40,350,6,60,2.5,28,1.2</div>
+      <div class="flex-gap" style="margin-top:10px">
+        <button class="btn-sm" onclick="baixarCSVModelo()">Baixar modelo.csv</button>
+        <button class="btn-sm" onclick="exportarHistoricoCSV()">Exportar histórico.csv</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ TAB HISTÓRICO ══════ -->
+  <div id="tab-historico" style="display:none">
+    <div class="card spacer">
+      <div class="card-title">Histórico de Simulações Salvas</div>
+      <div id="histContainer">
+        <div class="hist-empty">// nenhuma simulação salva ainda.<br>Rode uma simulação e clique em "Salvar no Histórico".</div>
+      </div>
+    </div>
+    <div class="flex-gap">
+      <button class="btn-sm" onclick="exportarHistoricoCSV()">Exportar CSV</button>
+      <button class="btn-sm" onclick="exportarHistoricoJSON()">Exportar JSON</button>
+      <button class="btn-danger" onclick="limparHistorico()">Limpar tudo</button>
+    </div>
+  </div>
+
+  <!-- ══════ TAB MODELO ══════ -->
+  <div id="tab-modelo" style="display:none">
+    <div class="card spacer">
+      <div class="card-title">Arquitetura da rede neural física</div>
+      <div class="nn-vis" id="nnVis"></div>
+      <div style="margin-top:16px;font-size:13px;color:var(--muted);line-height:1.9">
+        <p style="margin-bottom:8px">O modelo combina uma <strong style="color:var(--text);font-weight:600">Physics-Informed Neural Network</strong> com integração numérica RK4:</p>
+        <p>→ Lei do gás ideal para pressão de câmara via CO₂ gerado pela reação</p>
+        <p>→ Tsiolkovsky com Isp real: v_ej calculado por Bernoulli com Cd_nozzle = 0.62</p>
+        <p>→ Arrasto aerodinâmico com Cd configurável e <strong style="color:var(--accent3)">área frontal do CORPO</strong> do foguete</p>
+        <p>→ Pressão de selamento: impulso só começa quando P_câmara ≥ P_selo</p>
+        <p>→ Perda de arrasto durante fase de impulso calculada analiticamente</p>
+        <p>→ Integrador RK4 em passos de 5ms + sweep refinado a 0.5°</p>
+      </div>
+      <div class="grid-3" style="margin-top:18px">
+        <div class="metric"><div class="metric-val accent" style="font-size:19px">RK4</div><div class="metric-lbl">INTEGRADOR</div></div>
+        <div class="metric"><div class="metric-val blue"   style="font-size:19px">5ms</div><div class="metric-lbl">PASSO TEMPORAL</div></div>
+        <div class="metric"><div class="metric-val orange" style="font-size:19px">0.5°</div><div class="metric-lbl">RESOLUÇÃO</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Equações físicas</div>
+      <div class="code-block">// Reação: NaHCO₃ + CH₃COOH → CO₂ + H₂O + sal
+n_CO₂     = (m_prop · frac_bicarb) / 0.084 mol
+
+// Lei do gás ideal → pressão de câmara
+P_câmara  = P_atm + n_CO₂ · R · T / V_câmara     [Pa]
+
+// Bernoulli com coef. descarga do bocal (Cd_nozzle = 0.62)
+v_ej      = 0.62 · √(2 · (P_câmara - P_selo) / ρ) [m/s]
+
+// Fluxo de massa e tempo de ejeção
+ṁ         = ρ · A_nozzle · v_ej                   [kg/s]
+t_ej      = m_prop / ṁ                             [s]
+
+// Tsiolkovsky → ΔV
+ΔV        = v_ej · ln(m₀ / m_final)               [m/s]
+
+// V₀ real (subtrai perda de arrasto durante impulso)
+V₀        = ΔV - (F_drag_médio / m) · t_ej        [m/s]
+
+// Trajetória — RK4 por passo de 5ms
+ρ_ar      = P_atm / (287.05 · T)                  [kg/m³]
+A_frontal = π · (d_corpo/2)²                       [m²]  ← área do CORPO
+F_drag    = 0.5 · ρ_ar · Cd · A_frontal · v²      [N]</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Estado global ────────────────────────────────────────────
+let climaData       = null;
+let ultimoResultado = null;
+
+// ── UI helpers ───────────────────────────────────────────────
+function setStatus(msg, tipo) {
+  document.getElementById('statusDot').className = 'status-dot ' + (tipo || '');
+  document.getElementById('statusMsg').textContent = msg;
+}
+function log(msg, tipo) {
+  const box = document.getElementById('logBox');
+  const el  = document.createElement('div');
+  el.className   = 'line-' + (tipo || 'info');
+  el.textContent = '> ' + msg;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+function switchTab(t) {
+  ['config','csv','historico','modelo'].forEach(id => {
+    document.getElementById('tab-' + id).style.display = id === t ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('on', ['config','csv','historico','modelo'][i] === t);
+  });
+  if (t === 'modelo')   desenharNN(true);
+  if (t === 'historico') renderHistorico();
+}
+
+// ── Neural net viz ───────────────────────────────────────────
+function desenharNN(ativo) {
+  const c = document.getElementById('nnVis');
+  c.innerHTML = '';
+  [{n:6,l:'entrada'},{n:9,l:'física'},{n:9,l:'oculta'},{n:6,l:'oculta'},{n:2,l:'saída'}]
+    .forEach((layer, li, arr) => {
+      const div = document.createElement('div');
+      div.className = 'nn-layer';
+      for (let i = 0; i < layer.n; i++) {
+        const nd = document.createElement('div');
+        nd.className = 'nn-node' + (ativo ? ' active' : '');
+        div.appendChild(nd);
+      }
+      const lbl = document.createElement('div');
+      lbl.className = 'nn-lbl'; lbl.textContent = layer.l;
+      div.appendChild(lbl); c.appendChild(div);
+      if (li < arr.length - 1) {
+        const conn = document.createElement('div');
+        conn.className = 'nn-conn' + (ativo ? ' active' : '');
+        c.appendChild(conn);
+      }
+    });
+}
+desenharNN(false);
+
+// ── Clima (Open-Meteo — sem API key) ─────────────────────────
+async function buscarClima() {
+  const cidade = document.getElementById('cidade').value.trim();
+  const pais   = document.getElementById('pais').value;
+  if (!cidade) { log('Digite o nome da cidade.', 'warn'); return; }
+  setStatus('Buscando clima para ' + cidade + '...', 'loading');
+  log('Consultando Open-Meteo Geocoding...', 'info');
+  try {
+    const gR = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cidade)}&count=10&language=pt&format=json`);
+    if (!gR.ok) throw new Error('Geocoding HTTP ' + gR.status);
+    const gD = await gR.json();
+    let r = (gD.results||[]).find(x => x.country_code === pais);
+    if (!r && gD.results?.length) r = gD.results[0];
+    if (!r) throw new Error('Cidade não encontrada.');
+    log(`Localização: ${r.name}, ${r.country} (${r.latitude.toFixed(3)}, ${r.longitude.toFixed(3)})`, 'ok');
+    const wR = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${r.latitude}&longitude=${r.longitude}&current=temperature_2m,surface_pressure,wind_speed_10m&wind_speed_unit=ms&timezone=auto`);
+    if (!wR.ok) throw new Error('Weather HTTP ' + wR.status);
+    const wD = await wR.json();
+    const cu = wD.current;
+    climaData = { vento: cu.wind_speed_10m, pressao: cu.surface_pressure, temp: cu.temperature_2m, nome: r.name };
+    document.getElementById('disp-vento').textContent   = climaData.vento.toFixed(1);
+    document.getElementById('disp-pressao').textContent = climaData.pressao.toFixed(0);
+    document.getElementById('disp-temp').textContent    = climaData.temp.toFixed(1);
+    setStatus(`Clima: ${r.name} — ${climaData.temp.toFixed(1)}°C, vento ${climaData.vento.toFixed(1)} m/s`, 'ok');
+    log(`Temp: ${climaData.temp.toFixed(1)}°C | Pressão: ${climaData.pressao.toFixed(0)} hPa | Vento: ${climaData.vento.toFixed(1)} m/s`, 'ok');
+  } catch(e) {
+    setStatus('Falha na API. Usando ISA padrão.', 'error');
+    log('Erro: ' + e.message + ' → ISA padrão (25°C, 1013 hPa, 2 m/s)', 'warn');
+    climaData = { vento: 2.0, pressao: 1013.25, temp: 25.0, nome: cidade };
+    document.getElementById('disp-vento').textContent   = '2.0';
+    document.getElementById('disp-pressao').textContent = '1013';
+    document.getElementById('disp-temp').textContent    = '25.0';
+  }
+}
+
+// ── Física corrigida: V₀ real ────────────────────────────────
+// CORREÇÃO PRINCIPAL: área frontal usa rCorpo (raio do CORPO),
+// não rNozzle (raio do bocal). Bocal de 8mm = 0.5 cm² — minúsculo!
+// Corpo de 50mm = 19.6 cm² — essa é a área que o ar "enxerga".
+function calcularV0(params, clima) {
+  const { massaTotalKg, massaPropKg, volumeM3, rNozzle, rCorpo, propVB, pressaoSeloBar, Cd } = params;
+  const T    = clima.temp + 273.15;
+  const Patm = clima.pressao * 100;
+
+  // 1) CO₂ gerado (NaHCO₃ + CH₃COOH → CO₂): M = 84 g/mol
+  const fracBicarb  = 1 / (propVB + 1);
+  const massaBicarb = massaPropKg * fracBicarb;     // kg
+  const nCO2        = massaBicarb / 0.084;          // mol
+
+  // 2) Pressão de câmara — lei do gás ideal PV = nRT
+  const Pcamara = Patm + (nCO2 * 8.314 * T) / volumeM3;
+
+  // 3) Pressão de abertura (selamento)
+  const Pselo   = Patm + pressaoSeloBar * 1e5;
+  const Putil   = Math.max(Pcamara - Pselo, 0);    // pressão efetiva disponível
+
+  // 4) Velocidade de ejeção — Bernoulli + coeficiente de descarga do bocal
+  const Cd_nozzle = 0.62;                           // bocal cônico típico
+  const rhoFluid  = 1000;                           // kg/m³ (mistura ≈ água)
+  const v_ej      = Cd_nozzle * Math.sqrt(2 * Putil / rhoFluid);
+
+  // 5) Fluxo mássico e tempo de ejeção
+  const A_nozzle = Math.PI * rNozzle * rNozzle;    // m²
+  const mdot     = rhoFluid * A_nozzle * v_ej;     // kg/s
+  const t_ej     = mdot > 1e-6 ? massaPropKg / mdot : 1.0;  // s
+
+  // 6) ΔV — Tsiolkovsky com razão de massas real
+  const mf  = Math.max(massaTotalKg - massaPropKg * 0.92, massaTotalKg * 0.2);
+  const dV  = v_ej > 0 ? v_ej * Math.log(massaTotalKg / mf) : 0;
+
+  // 7) Perda de arrasto durante fase de impulso (velocidade média ≈ dV/2)
+  const rhoAr     = Patm / (287.05 * T);
+  const A_frontal = Math.PI * rCorpo * rCorpo;     // área do CORPO (corrigido)
+  const vMedio    = dV / 2;
+  const Fd_medio  = 0.5 * rhoAr * Cd * A_frontal * vMedio * vMedio;
+  const perdaDrag = (Fd_medio / massaTotalKg) * t_ej;
+  const v0        = Math.max(dV - perdaDrag, 0.3);
+
+  return { v0, Pcamara, Pselo, Putil, v_ej, mdot, t_ej, nCO2 };
+}
+
+// ── Trajetória — RK4 com arrasto e vento ─────────────────────
+function simularTrajetoria(angulo_deg, v0, params, clima) {
+  const g         = 9.81;
+  const angRad    = angulo_deg * Math.PI / 180;
+  const T         = clima.temp + 273.15;
+  const Patm      = clima.pressao * 100;
+  const rhoAr     = Patm / (287.05 * T);
+  const Cd        = params.Cd;
+  const A_frontal = Math.PI * params.rCorpo * params.rCorpo;  // área do CORPO
+  const massa     = Math.max(params.massaTotalKg - params.massaPropKg * 0.92, 0.01);
+  const vVento    = clima.vento;
+
+  function deriv(vx, vy) {
+    const vRelX = vx - vVento;
+    const vRel  = Math.sqrt(vRelX * vRelX + vy * vy) + 1e-9;
+    const Fd    = 0.5 * rhoAr * Cd * A_frontal * vRel * vRel;
+    return { ax: -(Fd * vRelX / vRel) / massa, ay: -g - (Fd * vy / vRel) / massa };
+  }
+
+  let vx = v0 * Math.cos(angRad), vy = v0 * Math.sin(angRad);
+  let x = 0, y = 0, maxY = 0, tempo = 0;
+  const dt = 0.005;
+
+  for (let i = 0; i < 80000 && y >= 0; i++) {
+    const k1 = deriv(vx, vy);
+    const k2 = deriv(vx + k1.ax*dt/2, vy + k1.ay*dt/2);
+    const k3 = deriv(vx + k2.ax*dt/2, vy + k2.ay*dt/2);
+    const k4 = deriv(vx + k3.ax*dt,   vy + k3.ay*dt);
+    vx += (k1.ax + 2*k2.ax + 2*k3.ax + k4.ax) * dt / 6;
+    vy += (k1.ay + 2*k2.ay + 2*k3.ay + k4.ay) * dt / 6;
+    x  += vx * dt; y += vy * dt; tempo += dt;
+    if (y > maxY) maxY = y;
+  }
+  return { distancia: Math.max(x, 0), alturaMax: maxY, tempo };
+}
+
+// ── Simulação principal ──────────────────────────────────────
+function rodarSimulacao() {
+  if (!climaData) {
+    log('Buscando clima automaticamente...', 'warn');
+    buscarClima().then(() => setTimeout(rodarSimulacao, 1800));
+    return;
+  }
+  const btn = document.getElementById('btnSimular');
+  btn.disabled = true; btn.textContent = 'SIMULANDO...';
+
+  const massaTotal     = parseFloat(document.getElementById('massaTotal').value);
+  const diametroCorpo  = parseFloat(document.getElementById('diametroCorpo').value) / 1000;
+  const volumeCamara   = parseFloat(document.getElementById('volumeCamara').value);
+  const diametroNozzle = parseFloat(document.getElementById('diametroNozzle').value) / 1000;
+  const propVB         = parseFloat(document.getElementById('propVB').value);
+  const massaProp      = parseFloat(document.getElementById('massaProp').value);
+  const comprimento    = parseFloat(document.getElementById('comprimento').value);
+  const Cd             = parseFloat(document.getElementById('cdSelect').value);
+  const pressaoSelo    = parseFloat(document.getElementById('pressaoSelo').value);
+  const angMin         = parseInt(document.getElementById('angMin').value);
+  const angMax         = parseInt(document.getElementById('angMax').value);
+  const nomeRocket     = document.getElementById('nomeRocket').value.trim() || 'Sem nome';
+
+  const params = {
+    massaTotalKg  : massaTotal / 1000,
+    massaPropKg   : massaProp  / 1000,
+    volumeM3      : volumeCamara / 1e6,
+    rNozzle       : diametroNozzle / 2,
+    rCorpo        : diametroCorpo  / 2,
+    propVB, Cd, nome: nomeRocket,
+    pressaoSeloBar: pressaoSelo,
+    comprimento   : comprimento / 100
+  };
+
+  setTimeout(() => {
+    log('Calculando V₀ (gás ideal + Bernoulli + Tsiolkovsky)...', 'info');
+    const phys = calcularV0(params, climaData);
+    const { v0, Pcamara, Pselo, Putil, v_ej, mdot, t_ej, nCO2 } = phys;
+    const rhoAr = (climaData.pressao * 100) / (287.05 * (climaData.temp + 273.15));
+    const Acm2  = (Math.PI * params.rCorpo * params.rCorpo * 1e4).toFixed(2);
+
+    log(`CO₂ gerado: ${nCO2.toFixed(4)} mol`, 'info');
+    log(`P câmara: ${(Pcamara/1e5).toFixed(3)} bar | P selo: ${(Pselo/1e5).toFixed(2)} bar | P útil: ${(Putil/1e5).toFixed(3)} bar`, 'ok');
+    log(`v_ej: ${v_ej.toFixed(2)} m/s | ṁ: ${(mdot*1000).toFixed(1)} g/s | t_ej: ${t_ej.toFixed(3)} s`, 'ok');
+    log(`Área frontal do corpo: ${Acm2} cm² | ρ_ar: ${rhoAr.toFixed(4)} kg/m³`, 'info');
+    log(`V₀ final: ${v0.toFixed(2)} m/s`, 'ok');
+    log(`Sweep ${angMin}°→${angMax}° (passo 5°)...`, 'info');
+
+    const resultados = [];
+    for (let ang = angMin; ang <= angMax; ang += 5) {
+      resultados.push({ ang, ...simularTrajetoria(ang, v0, params, climaData) });
+    }
+    resultados.sort((a,b) => b.distancia - a.distancia);
+    const melhorGrosso = resultados[0];
+
+    let melhorFino = melhorGrosso;
+    for (let ang = melhorGrosso.ang - 4; ang <= melhorGrosso.ang + 4; ang += 0.5) {
+      if (ang < 5 || ang > 85) continue;
+      const r = simularTrajetoria(ang, v0, params, climaData);
+      if (r.distancia > melhorFino.distancia) melhorFino = { ang, ...r };
+    }
+
+    log(`Ângulo ótimo: ${melhorFino.ang.toFixed(1)}°`, 'ok');
+    log(`Distância: ${melhorFino.distancia.toFixed(2)} m | Altura: ${melhorFino.alturaMax.toFixed(2)} m | Voo: ${melhorFino.tempo.toFixed(2)} s`, 'ok');
+
+    desenharTrajetoria(melhorFino.ang, v0, params, climaData);
+    exibirResultado(melhorFino, v0, resultados, params);
+
+    ultimoResultado = {
+      nome: nomeRocket, data: new Date().toLocaleString('pt-BR'),
+      angulo: melhorFino.ang, distancia: melhorFino.distancia,
+      alturaMax: melhorFino.alturaMax, tempo: melhorFino.tempo,
+      v0, v_ej, pcamara_bar: Pcamara/1e5,
+      clima: { ...climaData },
+      params: { massaTotal, diametroCorpo: diametroCorpo*1000,
+        volumeCamara, diametroNozzle: diametroNozzle*1000,
+        massaProp, propVB, comprimento, pressaoSelo, Cd }
+    };
+
+    btn.disabled = false; btn.textContent = 'SIMULAR E ENCONTRAR ÂNGULO ÓTIMO';
+    setStatus(`Ângulo ótimo: ${melhorFino.ang.toFixed(1)}° → distância: ${melhorFino.distancia.toFixed(1)} m`, 'ok');
+  }, 60);
+}
+
+// ── Exibir resultado ─────────────────────────────────────────
+function exibirResultado(melhor, v0, todos, params) {
+  const blk = document.getElementById('resultBlock');
+  blk.classList.remove('hidden');
+  document.getElementById('resAngulo').textContent = melhor.ang.toFixed(1) + '°';
+  document.getElementById('resDist').textContent   = melhor.distancia.toFixed(1);
+  document.getElementById('resVel').textContent    = v0.toFixed(2);
+  document.getElementById('resAltura').textContent = melhor.alturaMax.toFixed(1);
+  document.getElementById('resTempo').textContent  = melhor.tempo.toFixed(2);
+  const ventoDesc = climaData.vento > 3
+    ? ` Vento ${climaData.vento.toFixed(1)} m/s desvia o ótimo de 45°.`
+    : ' Condição de vento favorável.';
+  document.getElementById('resDesc').textContent =
+    `${params.nome} · V₀ = ${v0.toFixed(2)} m/s · ${climaData.pressao.toFixed(0)} hPa.${ventoDesc}`;
+  const grid = document.getElementById('sweepGrid');
+  grid.innerHTML = '';
+  const sorted  = [...todos].sort((a,b) => a.ang - b.ang);
+  const maxDist = Math.max(...sorted.map(r => r.distancia), 0.01);
+  sorted.forEach(r => {
+    const isBest = Math.abs(r.ang - melhor.ang) < 3.5;
+    const pct    = (r.distancia / maxDist * 100).toFixed(0);
+    const div    = document.createElement('div');
+    div.className = 'sweep-item' + (isBest ? ' best' : '');
+    div.innerHTML = `<span class="sweep-angle">${r.ang}°</span>
+      <div style="flex:1"><div class="sweep-bar"><div class="sweep-fill" style="width:${pct}%"></div></div></div>
+      <span class="sweep-dist">${r.distancia.toFixed(1)} m</span>`;
+    grid.appendChild(div);
+  });
+  blk.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Canvas: trajetória ───────────────────────────────────────
+function desenharTrajetoria(angulo_deg, v0, params, clima) {
+  const canvas = document.getElementById('trajCanvas');
+  const cont   = canvas.parentElement;
+  canvas.width = cont.clientWidth || 700; canvas.height = cont.clientHeight || 180;
+  const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const angRad    = angulo_deg * Math.PI / 180;
+  const T         = clima.temp + 273.15;
+  const Patm      = clima.pressao * 100;
+  const rhoAr     = Patm / (287.05 * T);
+  const g         = 9.81;
+  const massa     = Math.max(params.massaTotalKg - params.massaPropKg * 0.92, 0.01);
+  const A_frontal = Math.PI * params.rCorpo * params.rCorpo;
+  let vx = v0 * Math.cos(angRad), vy = v0 * Math.sin(angRad), x = 0, y = 0;
+  const pts = [[0,0]];
+  for (let i = 0; i < 20000 && y >= 0; i++) {
+    const vRelX = vx - clima.vento, vRel = Math.sqrt(vRelX*vRelX + vy*vy) + 1e-9;
+    const Fd = 0.5 * rhoAr * params.Cd * A_frontal * vRel * vRel;
+    vx += -(Fd*vRelX/vRel)/massa * 0.01; vy += (-g-(Fd*vy/vRel)/massa)*0.01;
+    x += vx*0.01; y += vy*0.01; pts.push([x,y]);
+  }
+  const maxX = Math.max(...pts.map(p=>p[0]), 0.1);
+  const maxY = Math.max(...pts.map(p=>p[1]), 0.1);
+  const pad  = 34, scX = (W-pad*2)/maxX, scY = (H-pad*2)/maxY;
+  ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=0.5;
+  for(let gx=0;gx<=W;gx+=44){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
+  for(let gy=0;gy<=H;gy+=32){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+  ctx.strokeStyle='rgba(255,255,255,0.14)'; ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(pad,H-pad);ctx.lineTo(W-pad,H-pad);ctx.stroke();
+  const grad=ctx.createLinearGradient(0,0,W,0);
+  grad.addColorStop(0,'#ff6b35');grad.addColorStop(.5,'#00e5a0');grad.addColorStop(1,'#4d9fff');
+  ctx.strokeStyle=grad; ctx.lineWidth=2.5; ctx.shadowColor='#00e5a0'; ctx.shadowBlur=5;
+  ctx.beginPath();
+  pts.forEach(([px,py],i)=>{
+    const cx=pad+px*scX, cy=H-pad-py*scY;
+    i===0?ctx.moveTo(cx,cy):ctx.lineTo(cx,cy);
+  }); ctx.stroke(); ctx.shadowBlur=0;
+  ctx.fillStyle='#00e5a0'; ctx.beginPath(); ctx.arc(pad,H-pad,5,0,Math.PI*2); ctx.fill();
+  const last=pts[pts.length-1], ex=pad+last[0]*scX;
+  ctx.fillStyle='#4d9fff'; ctx.beginPath(); ctx.arc(ex,H-pad,5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='11px "Space Mono",monospace';
+  ctx.fillText(angulo_deg.toFixed(1)+'°', pad+8, H-pad-10);
+  ctx.fillText(maxX.toFixed(1)+' m', Math.max(ex-32,pad), H-pad-10);
+  ctx.fillText(maxY.toFixed(1)+' m alt.', pad+8, pad+14);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HISTÓRICO — localStorage
+// ══════════════════════════════════════════════════════════════
+const HIST_KEY = 'obafog_historico_v2';
+function carregarHistorico() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch { return []; }
+}
+function salvarHistorico(h) { localStorage.setItem(HIST_KEY, JSON.stringify(h)); }
+
+function salvarResultado() {
+  if (!ultimoResultado) { alert('Rode uma simulação primeiro.'); return; }
+  const hist = carregarHistorico();
+  hist.unshift({ id: Date.now(), ...ultimoResultado });
+  salvarHistorico(hist);
+  log('Salvo no histórico: ' + ultimoResultado.nome, 'ok');
+  setStatus('Salvo! ' + hist.length + ' registro(s) no histórico.', 'ok');
+  const btn = document.getElementById('btnSalvar');
+  btn.textContent = '✓ SALVO!';
+  setTimeout(() => { btn.textContent = 'SALVAR NO HISTÓRICO ↓'; }, 2500);
+}
+
+function renderHistorico() {
+  const hist = carregarHistorico();
+  const cont = document.getElementById('histContainer');
+  if (!hist.length) {
+    cont.innerHTML = '<div class="hist-empty">// nenhuma simulação salva ainda.<br>Rode uma simulação e clique em "Salvar no Histórico".</div>';
+    return;
+  }
+  cont.innerHTML = '';
+  hist.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.innerHTML = `
+      <div class="hist-rank">#${idx+1}</div>
+      <div class="hist-badge">${item.angulo.toFixed(1)}°</div>
+      <div class="hist-meta">
+        <div class="hist-meta-title">${item.nome}</div>
+        <div class="hist-meta-sub">${item.data} · ${item.clima.nome||'—'} · ${item.clima.temp.toFixed(1)}°C · vento ${item.clima.vento.toFixed(1)} m/s</div>
+      </div>
+      <div class="hist-stats">
+        <div class="hist-stat"><div class="hist-stat-val" style="color:var(--accent)">${item.distancia.toFixed(1)}</div><div class="hist-stat-lbl">m dist.</div></div>
+        <div class="hist-stat"><div class="hist-stat-val" style="color:var(--accent2)">${item.alturaMax.toFixed(1)}</div><div class="hist-stat-lbl">m alt.</div></div>
+        <div class="hist-stat"><div class="hist-stat-val" style="color:var(--accent3)">${item.v0.toFixed(2)}</div><div class="hist-stat-lbl">m/s V₀</div></div>
+        <div class="hist-stat"><div class="hist-stat-val" style="color:var(--warn)">${item.tempo.toFixed(2)}</div><div class="hist-stat-lbl">s voo</div></div>
+      </div>
+      <div class="hist-actions">
+        <button class="btn-sm" onclick="carregarSimulacao(${idx})">Carregar</button>
+        <button class="btn-danger" onclick="deletarSimulacao(${idx})">✕</button>
+      </div>`;
+    cont.appendChild(div);
+  });
+}
+
+function carregarSimulacao(idx) {
+  const item = carregarHistorico()[idx];
+  if (!item) return;
+  const p = item.params;
+  document.getElementById('nomeRocket').value     = item.nome;
+  document.getElementById('massaTotal').value     = p.massaTotal;
+  document.getElementById('diametroCorpo').value  = p.diametroCorpo;
+  document.getElementById('volumeCamara').value   = p.volumeCamara;
+  document.getElementById('diametroNozzle').value = p.diametroNozzle;
+  document.getElementById('massaProp').value      = p.massaProp;
+  document.getElementById('propVB').value         = p.propVB;
+  document.getElementById('comprimento').value    = p.comprimento;
+  document.getElementById('pressaoSelo').value    = p.pressaoSelo;
+  document.getElementById('cdSelect').value       = p.Cd;
+  log('Configuração "' + item.nome + '" carregada do histórico.', 'ok');
+  switchTab('config');
+}
+
+function deletarSimulacao(idx) {
+  const hist = carregarHistorico();
+  if (!confirm('Apagar "' + hist[idx]?.nome + '"?')) return;
+  hist.splice(idx, 1);
+  salvarHistorico(hist); renderHistorico();
+}
+
+function limparHistorico() {
+  if (!confirm('Apagar TODO o histórico?')) return;
+  localStorage.removeItem(HIST_KEY); renderHistorico();
+  log('Histórico apagado.', 'warn');
+}
+
+// ── Exportar ─────────────────────────────────────────────────
+function exportarHistoricoCSV() {
+  const hist = carregarHistorico();
+  if (!hist.length) { alert('Histórico vazio.'); return; }
+  const hdr = 'nome,data,angulo_otimo_deg,distancia_m,altura_max_m,tempo_voo_s,v0_ms,v_ej_ms,pcamara_bar,cidade,temp_C,pressao_hPa,vento_ms,massa_total_g,diam_corpo_mm,vol_camara_ml,diam_nozzle_mm,massa_prop_g,prop_vb,comprimento_cm,pressao_selo_bar,Cd';
+  const rows = hist.map(h => [
+    `"${h.nome}"`,`"${h.data}"`,
+    h.angulo.toFixed(2),h.distancia.toFixed(2),h.alturaMax.toFixed(2),
+    h.tempo.toFixed(3),h.v0.toFixed(3),h.v_ej?.toFixed(3)||'',h.pcamara_bar?.toFixed(3)||'',
+    `"${h.clima.nome}"`,h.clima.temp.toFixed(1),h.clima.pressao.toFixed(0),h.clima.vento.toFixed(1),
+    h.params.massaTotal,h.params.diametroCorpo,h.params.volumeCamara,
+    h.params.diametroNozzle,h.params.massaProp,h.params.propVB,
+    h.params.comprimento,h.params.pressaoSelo,h.params.Cd
+  ].join(','));
+  baixarArquivo([hdr,...rows].join('\n'), 'historico_obafog.csv', 'text/csv');
+}
+
+function exportarHistoricoJSON() {
+  const hist = carregarHistorico();
+  if (!hist.length) { alert('Histórico vazio.'); return; }
+  baixarArquivo(JSON.stringify(hist, null, 2), 'historico_obafog.json', 'application/json');
+}
+
+function baixarArquivo(conteudo, nome, tipo) {
+  const blob = new Blob([conteudo], { type: tipo + ';charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nome;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ── CSV do foguete ───────────────────────────────────────────
+function lerCSV(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const lines   = e.target.result.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g,''));
+      const vals    = (lines[1]||'').split(',').map(v => v.trim().replace(/"/g,''));
+      const map     = {};
+      headers.forEach((h,i) => { map[h] = vals[i]; });
+      const fmap = {
+        'nome_foguete':'nomeRocket','massa_total_g':'massaTotal',
+        'diametro_corpo_mm':'diametroCorpo','volume_camara_ml':'volumeCamara',
+        'diametro_nozzle_mm':'diametroNozzle','massa_propelente_g':'massaProp',
+        'prop_vinagre_bicarb':'propVB','comprimento_cm':'comprimento',
+        'pressao_selo_bar':'pressaoSelo'
+      };
+      let n = 0;
+      Object.entries(fmap).forEach(([k,id]) => {
+        if (map[k] !== undefined && map[k] !== '') {
+          const el = document.getElementById(id);
+          if (el) { el.value = map[k]; n++; }
+        }
+      });
+      document.getElementById('csvStatus').innerHTML =
+        `<span style="color:var(--accent)">✓ ${n} campo(s) importado(s) de "${file.name}"</span>`;
+      log(`CSV: ${n} campo(s) carregado(s) de ${file.name}`, 'ok');
+      switchTab('config');
+    } catch(err) {
+      document.getElementById('csvStatus').innerHTML =
+        `<span style="color:var(--danger)">✗ Erro: ${err.message}</span>`;
+      log('Erro CSV: ' + err.message, 'err');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function baixarCSVModelo() {
+  baixarArquivo([
+    'nome_foguete,massa_total_g,diametro_corpo_mm,volume_camara_ml,diametro_nozzle_mm,massa_propelente_g,prop_vinagre_bicarb,comprimento_cm,pressao_selo_bar',
+    'Prototipo 1,250,50,500,8,80,3,35,1.5',
+    'Prototipo 2,320,60,700,10,110,3.5,42,2.0',
+    'Prototipo 3,180,40,350,6,60,2.5,28,1.2'
+  ].join('\n'), 'foguete_modelo.csv', 'text/csv');
+}
+
+// ── Init ─────────────────────────────────────────────────────
+buscarClima();
+</script>
+</body>
+</html>
